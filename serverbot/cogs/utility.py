@@ -10,6 +10,9 @@ from discord.ext import commands, tasks
 from utils import format_duration, make_embed, owner_only, parse_duration
 
 
+_CDN_EMOJI = re.compile(r"https?://(?:cdn|media)\.discordapp\.(?:com|net)/emojis/(\d+)(?:\.(\w+))?(?:\?(\S*))?", re.I)
+
+
 @app_commands.guild_only()
 class Utility(commands.GroupCog, group_name="utility", group_description="Utility commands"):
     def __init__(self, bot):
@@ -176,22 +179,31 @@ class Utility(commands.GroupCog, group_name="utility", group_description="Utilit
 
     # ---------- emojis ----------
     @app_commands.command(description="Add a custom emoji from another server to this one")
-    @app_commands.describe(emoji="The custom emoji (paste it)", name="Optional new name")
+    @app_commands.describe(emoji="The custom emoji, or a cdn.discordapp.com/emojis/... link", name="Optional new name")
     @app_commands.checks.has_permissions(manage_expressions=True)
     @app_commands.checks.bot_has_permissions(manage_expressions=True)
     async def steal(self, interaction: discord.Interaction, emoji: str, name: str | None = None):
-        pe = discord.PartialEmoji.from_str(emoji.strip())
-        if not pe.id:
-            return await interaction.response.send_message("Paste a custom emoji (not a normal Unicode one).", ephemeral=True)
+        emoji = emoji.strip()
+        m = _CDN_EMOJI.fullmatch(emoji)
+        if m:
+            emoji_id = int(m.group(1))
+            animated = (m.group(2) or "").lower() == "gif" or "animated=true" in (m.group(3) or "").lower()
+            default_name = f"emoji_{emoji_id % 100000}"
+        else:
+            pe = discord.PartialEmoji.from_str(emoji)
+            if not pe.id:
+                return await interaction.response.send_message(
+                    "Paste a custom emoji or a cdn.discordapp.com/emojis/... link.", ephemeral=True)
+            emoji_id, animated, default_name = pe.id, pe.animated, pe.name
         await interaction.response.defer()
-        url = f"https://cdn.discordapp.com/emojis/{pe.id}.{'gif' if pe.animated else 'png'}"
+        url = f"https://cdn.discordapp.com/emojis/{emoji_id}.{'gif' if animated else 'png'}?size=128"
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as resp:
                 if resp.status != 200:
                     return await interaction.followup.send("I couldn't download that emoji.")
                 data = await resp.read()
         try:
-            new = await interaction.guild.create_custom_emoji(name=name or pe.name, image=data, reason=f"Stolen by {interaction.user}")
+            new = await interaction.guild.create_custom_emoji(name=name or default_name, image=data, reason=f"Stolen by {interaction.user}")
         except discord.HTTPException as e:
             return await interaction.followup.send(f"Couldn't add it (emoji slots full?): {e}")
         await interaction.followup.send(f"Added {new} as `:{new.name}:`")
