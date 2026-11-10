@@ -74,7 +74,7 @@ class Config(commands.GroupCog, group_name="config", group_description="Bot conf
 
     @app_commands.command(name="bot-avatar", description="Change the bot's avatar (owner only)")
     @owner_only()
-    async def bot_avatar(self, interaction: discord.Interaction, image: discord.Attachment):
+    async def set_avatar(self, interaction: discord.Interaction, image: discord.Attachment):
         if not (image.content_type or "").startswith("image/"):
             return await interaction.response.send_message("That file isn't an image.", ephemeral=True)
         await interaction.response.defer(ephemeral=True)
@@ -86,7 +86,7 @@ class Config(commands.GroupCog, group_name="config", group_description="Bot conf
 
     @app_commands.command(name="bot-name", description="Change the bot's display username (owner only)")
     @owner_only()
-    async def bot_name(self, interaction: discord.Interaction, name: app_commands.Range[str, 2, 32]):
+    async def set_username(self, interaction: discord.Interaction, name: app_commands.Range[str, 2, 32]):
         await interaction.response.defer(ephemeral=True)
         try:
             await self.bot.user.edit(username=name)
