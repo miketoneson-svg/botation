@@ -4,7 +4,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utils import make_embed, owner_only
+from utils import Confirm, make_embed, owner_only
 
 
 def _chunk(items: list[str], limit: int = 1000) -> list[str]:
@@ -52,6 +52,21 @@ class Core(commands.Cog):
         embed.add_field(name="Python", value=platform.python_version())
         embed.add_field(name="discord.py", value=discord.__version__)
         await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="leave-server", description="Make the bot leave this server (administrators only)")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def leave_server(self, interaction: discord.Interaction):
+        guild = interaction.guild
+
+        async def action(i: discord.Interaction):
+            await i.followup.send(f"Leaving **{guild.name}**. Goodbye.", ephemeral=True)
+            await guild.leave()
+
+        await interaction.response.send_message(
+            "Are you sure? I'll leave this server and will need a new invite to come back. "
+            "My saved settings for this server stay in the database.",
+            view=Confirm(interaction.user.id, action, "Leave server"), ephemeral=True,
+        )
 
 
 @app_commands.guild_only()
