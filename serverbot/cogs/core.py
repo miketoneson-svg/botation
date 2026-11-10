@@ -68,6 +68,22 @@ class Core(commands.Cog):
             view=Confirm(interaction.user.id, action, "Leave server"), ephemeral=True,
         )
 
+    @app_commands.command(name="list-servers", description="List every server the bot is in (owner only)")
+    @owner_only()
+    async def list_servers(self, interaction: discord.Interaction):
+        guilds = sorted(self.bot.guilds, key=lambda g: g.member_count or 0, reverse=True)
+        lines = [f"**{g.name}** - `{g.id}` - {g.member_count or 0} members" for g in guilds]
+        text, shown = "", 0
+        for line in lines:
+            if len(text) + len(line) + 1 > 3900:
+                break
+            text += line + "\n"
+            shown += 1
+        if shown < len(lines):
+            text += f"...and {len(lines) - shown} more"
+        embed = make_embed(f"Servers ({len(guilds)})", text or "I'm not in any servers.")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
 
 @app_commands.guild_only()
 class Config(commands.GroupCog, group_name="config", group_description="Bot configuration"):
