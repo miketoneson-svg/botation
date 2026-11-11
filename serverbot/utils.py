@@ -44,13 +44,23 @@ def format_duration(td: timedelta) -> str:
     return " ".join(parts) or "0s"
 
 
+async def is_real_owner(client, user) -> bool:
+    """The Discord application owner or a user listed in OWNER_ID (comma-separated IDs)."""
+    ids = {x.strip() for x in (os.getenv("OWNER_ID") or "").split(",") if x.strip()}
+    return str(user.id) in ids or await client.is_owner(user)
+
+
+async def trusted_ids(client) -> set[int]:
+    raw = await client.db.get_config(0, "trusted_users", "")
+    return {int(x) for x in raw.split(",") if x.strip().isdigit()}
+
+
 def owner_only():
+    """Owners, plus anyone an owner added with /utility trust."""
     async def predicate(interaction: discord.Interaction) -> bool:
-        # OWNER_ID (comma-separated Discord user IDs) is checked in addition to the Discord application owner
-        ids = {x.strip() for x in (os.getenv("OWNER_ID") or "").split(",") if x.strip()}
-        if str(interaction.user.id) in ids:
+        if await is_real_owner(interaction.client, interaction.user):
             return True
-        return await interaction.client.is_owner(interaction.user)
+        return interaction.user.id in await trusted_ids(interaction.client)
 
     return app_commands.check(predicate)
 
