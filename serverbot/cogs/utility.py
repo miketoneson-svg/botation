@@ -7,7 +7,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from utils import format_duration, make_embed, owner_only, parse_duration
+from utils import format_duration, is_real_owner, make_embed, owner_only, parse_duration, trusted_ids
 
 
 _CDN_EMOJI = re.compile(r"https?://(?:cdn|media)\.discordapp\.(?:com|net)/emojis/(\d+)(?:\.(\w+))?(?:\?(\S*))?", re.I)
@@ -176,6 +176,40 @@ class Utility(commands.GroupCog, group_name="utility", group_description="Utilit
         await interaction.response.defer(ephemeral=True)
         synced = await self.bot.tree.sync()
         await interaction.followup.send(f"Synced {len(synced)} commands globally (can take a few minutes to show).", ephemeral=True)
+
+    # ---------- trusted users ----------
+    async def _save_trusted(self, ids: set[int]):
+        await self.bot.db.set_config(0, "trusted_users", ",".join(str(i) for i in sorted(ids)))
+
+    @app_commands.command(description="Let a user run the owner-only commands (owner only)")
+    @app_commands.describe(user="The user to trust")
+    async def trust(self, interaction: discord.Interaction, user: discord.User):
+        if not await is_real_owner(self.bot, interaction.user):
+            return await interaction.response.send_message("Only the bot owner can change who is trusted.", ephemeral=True)
+        if user.bot:
+            return await interaction.response.send_message("You can't trust a bot.", ephemeral=True)
+        ids = await trusted_ids(self.bot)
+        ids.add(user.id)
+        await self._save_trusted(ids)
+        await interaction.response.send_message(f"{user.mention} can now run the owner-only commands.", ephemeral=True)
+
+    @app_commands.command(description="Remove a user's access to the owner-only commands (owner only)")
+    @app_commands.describe(user="The user to remove")
+    async def untrust(self, interaction: discord.Interaction, user: discord.User):
+        if not await is_real_owner(self.bot, interaction.user):
+            return await interaction.response.send_message("Only the bot owner can change who is trusted.", ephemeral=True)
+        ids = await trusted_ids(self.bot)
+        ids.discard(user.id)
+        await self._save_trusted(ids)
+        await interaction.response.send_message(f"{user.mention} no longer has owner-only access.", ephemeral=True)
+
+    @app_commands.command(description="List users trusted with the owner-only commands (owner only)")
+    async def trusted(self, interaction: discord.Interaction):
+        if not await is_real_owner(self.bot, interaction.user):
+            return await interaction.response.send_message("Only the bot owner can see this.", ephemeral=True)
+        ids = await trusted_ids(self.bot)
+        text = "\n".join(f"<@{i}> (`{i}`)" for i in sorted(ids)) or "Nobody is trusted yet."
+        await interaction.response.send_message(embed=make_embed("Trusted users", text), ephemeral=True)
 
     # ---------- emojis ----------
     @app_commands.command(description="Add a custom emoji from another server to this one")
