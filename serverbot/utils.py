@@ -46,6 +46,10 @@ def format_duration(td: timedelta) -> str:
 
 def owner_only():
     async def predicate(interaction: discord.Interaction) -> bool:
+        # OWNER_ID (comma-separated Discord user IDs) is checked in addition to the Discord application owner
+        ids = {x.strip() for x in (os.getenv("OWNER_ID") or "").split(",") if x.strip()}
+        if str(interaction.user.id) in ids:
+            return True
         return await interaction.client.is_owner(interaction.user)
 
     return app_commands.check(predicate)
