@@ -53,8 +53,8 @@ class Core(commands.Cog):
         embed.add_field(name="discord.py", value=discord.__version__)
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="leave-server", description="Make the bot leave this server (administrators only)")
-    @app_commands.checks.has_permissions(administrator=True)
+    @app_commands.command(name="leave-server", description="Make the bot leave this server (owner only)")
+    @owner_only()
     async def leave_server(self, interaction: discord.Interaction):
         guild = interaction.guild
 
